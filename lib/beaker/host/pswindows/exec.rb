@@ -61,6 +61,19 @@ module PSWindows::Exec
   end
 
   def get_ip
+    # Try PowerShell first (Windows Server 2016+)
+    result = execute("powershell -Command \"Get-NetIPAddress -AddressFamily IPv4 -PrefixOrigin Dhcp,Manual | Where-Object {$_.IPAddress -notlike '169.254.*' -and $_.IPAddress -ne '127.0.0.1'} | Select-Object -First 1 -ExpandProperty IPAddress\"", :accept_all_exit_codes => true)
+    
+    if result.exit_code == 0 && !result.stdout.strip.empty?
+      return result.stdout.strip
+    end
+
+    # Fallback to wmic for older systems
+    get_ip_wmic
+  end
+
+  # @api private
+  def get_ip_wmic
     # when querying for an IP this way the return value can be formatted like:
     # IPAddress=
     # IPAddress={"129.168.0.1"}

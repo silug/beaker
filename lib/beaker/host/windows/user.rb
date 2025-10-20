@@ -2,6 +2,27 @@ module Windows::User
   include Beaker::CommandFactory
 
   def user_list
+    # Try PowerShell first (Windows Server 2016+)
+    result = execute("powershell -Command \"Get-LocalUser | Select-Object -ExpandProperty Name\"", :accept_all_exit_codes => true)
+    
+    if result.exit_code == 0
+      users = []
+      result.stdout.each_line do |line|
+        username = line.strip
+        users << username unless username.empty?
+      end
+
+      yield result if block_given?
+
+      return users unless users.empty?
+    end
+
+    # Fallback to wmic for older systems
+    user_list_wmic
+  end
+
+  # @api private
+  def user_list_wmic
     execute('cmd /c echo "" | wmic useraccount where localaccount="true" get name /format:value') do |result|
       users = []
       result.stdout.each_line do |line|
